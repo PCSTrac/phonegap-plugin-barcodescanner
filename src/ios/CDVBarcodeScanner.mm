@@ -38,6 +38,28 @@
 @class CDVbcsViewController;
 
 //------------------------------------------------------------------------------
+// helper classes for presenting the camera over half the screen
+//------------------------------------------------------------------------------
+@interface PartialViewController: UIPresentationController
+@end
+
+@implementation PartialViewController
+
+- (CGRect)frameOfPresentedViewInContainerView {
+    CGFloat height = CGRectGetHeight(self.containerView.frame) / 2.0;
+    return CGRectMake(0,
+                      CGRectGetHeight(self.containerView.bounds) - height,
+                      CGRectGetWidth(self.containerView.frame),
+                      height);
+}
+
+- (void)containerViewWillLayoutSubviews {
+    self.presentedView.frame = [self frameOfPresentedViewInContainerView];
+}
+
+@end
+
+//------------------------------------------------------------------------------
 // plugin class
 //------------------------------------------------------------------------------
 @interface CDVBarcodeScanner : CDVPlugin {}
@@ -56,6 +78,7 @@
 @property (nonatomic, retain) CDVBarcodeScanner*           plugin;
 @property (nonatomic, retain) NSString*                   callback;
 @property (nonatomic, retain) UIViewController*           parentViewController;
+@property (nonatomic, retain) UIViewController*           presentingViewController;
 @property (nonatomic, retain) CDVbcsViewController*        viewController;
 @property (nonatomic, retain) AVCaptureSession*           captureSession;
 @property (nonatomic, retain) AVCaptureVideoPreviewLayer* previewLayer;
@@ -104,7 +127,7 @@
 //------------------------------------------------------------------------------
 // view controller for the ui
 //------------------------------------------------------------------------------
-@interface CDVbcsViewController : UIViewController <CDVBarcodeScannerOrientationDelegate> {}
+@interface CDVbcsViewController : UIViewController <CDVBarcodeScannerOrientationDelegate, UIViewControllerTransitioningDelegate> {}
 @property (nonatomic, retain) CDVbcsProcessor*  processor;
 @property (nonatomic, retain) NSString*        alternateXib;
 @property (nonatomic)         BOOL             shutterPressed;
@@ -157,9 +180,9 @@
 
     NSDictionary* options;
     if (command.arguments.count == 0) {
-      options = [NSDictionary dictionary];
+        options = [NSDictionary dictionary];
     } else {
-      options = command.arguments[0];
+        options = command.arguments[0];
     }
 
     BOOL preferFrontCamera = [options[@"preferFrontCamera"] boolValue];
@@ -184,23 +207,23 @@
     }
 
     processor = [[[CDVbcsProcessor alloc]
-                initWithPlugin:self
-                      callback:callback
-          parentViewController:self.viewController
-            alterateOverlayXib:overlayXib
-            ] autorelease];
+                  initWithPlugin:self
+                  callback:callback
+                  parentViewController:self.viewController
+                  alterateOverlayXib:overlayXib
+                  ] autorelease];
     // queue [processor scanBarcode] to run on the event loop
 
     if (preferFrontCamera) {
-      processor.isFrontCamera = true;
+        processor.isFrontCamera = true;
     }
 
     if (showFlipCameraButton) {
-      processor.isShowFlipCameraButton = true;
+        processor.isShowFlipCameraButton = true;
     }
 
     if (showTorchButton) {
-      processor.isShowTorchButton = true;
+        processor.isShowTorchButton = true;
     }
 
     processor.isSuccessBeepEnabled = !disableSuccessBeep;
@@ -286,6 +309,7 @@
 @synthesize plugin               = _plugin;
 @synthesize callback             = _callback;
 @synthesize parentViewController = _parentViewController;
+@synthesize presentingViewController = _presentingViewController;
 @synthesize viewController       = _viewController;
 @synthesize captureSession       = _captureSession;
 @synthesize previewLayer         = _previewLayer;
@@ -305,10 +329,10 @@ parentViewController:(UIViewController*)parentViewController
     self = [super init];
     if (!self) return self;
 
-    self.plugin               = plugin;
-    self.callback             = callback;
-    self.parentViewController = parentViewController;
-    self.alternateXib         = alternateXib;
+    self.plugin                  = plugin;
+    self.callback                = callback;
+    self.parentViewController    = parentViewController;
+    self.alternateXib            = alternateXib;
 
     self.capturing = NO;
     self.results = [[NSMutableArray new] autorelease];
@@ -341,8 +365,8 @@ parentViewController:(UIViewController*)parentViewController
 //--------------------------------------------------------------------------
 - (void)scanBarcode {
 
-//    self.captureSession = nil;
-//    self.previewLayer = nil;
+    //    self.captureSession = nil;
+    //    self.previewLayer = nil;
     NSString* errorMessage = [self setUpCaptureSession];
     if (errorMessage) {
         [self barcodeScanFailed:errorMessage];
@@ -359,6 +383,7 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)openDialog {
+    self.presentingViewController = self.parentViewController;
     [self.parentViewController
      presentViewController:self.viewController
      animated:self.isTransitionAnimated completion:nil
@@ -374,6 +399,7 @@ parentViewController:(UIViewController*)parentViewController
     // viewcontroller holding onto a reference to us, release them so they
     // will release us
     self.viewController = nil;
+    self.presentingViewController = nil;
 }
 
 //--------------------------------------------------------------------------
@@ -414,7 +440,7 @@ parentViewController:(UIViewController*)parentViewController
             [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
         }];
         if (self.isSuccessBeepEnabled) {
-          AudioServicesPlaySystemSound(_soundFileObject);
+            AudioServicesPlaySystemSound(_soundFileObject);
         }
     });
 }
@@ -443,21 +469,21 @@ parentViewController:(UIViewController*)parentViewController
         if (self.isFlipped) {
             self.isFlipped = NO;
         }
-    [self performSelector:@selector(scanBarcode) withObject:nil afterDelay:0.1];
+        [self performSelector:@selector(scanBarcode) withObject:nil afterDelay:0.1];
     }];
 }
 
 - (void)toggleTorch {
-  AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-  [device lockForConfiguration:nil];
-  if (device.flashActive) {
-    [device setTorchMode:AVCaptureTorchModeOff];
-    [device setFlashMode:AVCaptureFlashModeOff];
-  } else {
-    [device setTorchModeOnWithLevel:AVCaptureMaxAvailableTorchLevel error:nil];
-    [device setFlashMode:AVCaptureFlashModeOn];
-  }
-  [device unlockForConfiguration];
+    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    [device lockForConfiguration:nil];
+    if (device.flashActive) {
+        [device setTorchMode:AVCaptureTorchModeOff];
+        [device setFlashMode:AVCaptureFlashModeOff];
+    } else {
+        [device setTorchModeOnWithLevel:AVCaptureMaxAvailableTorchLevel error:nil];
+        [device setFlashMode:AVCaptureFlashModeOn];
+    }
+    [device unlockForConfiguration];
 }
 
 //--------------------------------------------------------------------------
@@ -467,7 +493,7 @@ parentViewController:(UIViewController*)parentViewController
     AVCaptureSession* captureSession = [[[AVCaptureSession alloc] init] autorelease];
     self.captureSession = captureSession;
 
-       AVCaptureDevice* __block device = nil;
+    AVCaptureDevice* __block device = nil;
     if (self.isFrontCamera) {
 
         NSArray* devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
@@ -503,11 +529,11 @@ parentViewController:(UIViewController*)parentViewController
     [output setMetadataObjectsDelegate:self queue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0)];
 
     if ([captureSession canSetSessionPreset:AVCaptureSessionPresetHigh]) {
-      captureSession.sessionPreset = AVCaptureSessionPresetHigh;
+        captureSession.sessionPreset = AVCaptureSessionPresetHigh;
     } else if ([captureSession canSetSessionPreset:AVCaptureSessionPresetMedium]) {
-      captureSession.sessionPreset = AVCaptureSessionPresetMedium;
+        captureSession.sessionPreset = AVCaptureSessionPresetMedium;
     } else {
-      return @"unable to preset high nor medium quality video capture";
+        return @"unable to preset high nor medium quality video capture";
     }
 
     if ([captureSession canAddInput:input]) {
@@ -864,11 +890,18 @@ parentViewController:(UIViewController*)parentViewController
     self = [super init];
     if (!self) return self;
 
+    self.modalPresentationStyle = UIModalPresentationCustom;
+    self.transitioningDelegate = self;
     self.processor = processor;
     self.shutterPressed = NO;
     self.alternateXib = alternateXib;
     self.overlayView = nil;
     return self;
+}
+
+//--------------------------------------------------------------------------
+- (UIPresentationController *)presentationControllerForPresentedViewController:(UIViewController *)presented presentingViewController:(UIViewController *)presenting sourceViewController:(UIViewController *)source {
+    return [[PartialViewController alloc] initWithPresentedViewController:presented presentingViewController:presenting];
 }
 
 //--------------------------------------------------------------------------
@@ -883,7 +916,11 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)loadView {
-    self.view = [[UIView alloc] initWithFrame: self.processor.parentViewController.view.frame];
+    self.view = [[UIView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
 
     // setup capture preview layer
     AVCaptureVideoPreviewLayer* previewLayer = self.processor.previewLayer;
@@ -894,9 +931,10 @@ parentViewController:(UIViewController*)parentViewController
         [previewLayer.connection setVideoOrientation:AVCaptureVideoOrientationPortrait];
     }
 
-    [self.view.layer insertSublayer:previewLayer below:[[self.view.layer sublayers] objectAtIndex:0]];
+    [self.view.layer addSublayer:previewLayer];
 
-    [self.view addSubview:[self buildOverlayView]];
+    self.overlayView = [self buildOverlayView];
+    [self.view addSubview:_overlayView];
 }
 
 //--------------------------------------------------------------------------
@@ -904,7 +942,9 @@ parentViewController:(UIViewController*)parentViewController
 
     // set video orientation to what the camera sees
     self.processor.previewLayer.connection.videoOrientation = (AVCaptureVideoOrientation) [[UIApplication sharedApplication] statusBarOrientation];
+}
 
+- (void)viewWillLayoutSubviews {
     // this fixes the bug when the statusbar is landscape, and the preview layer
     // starts up in portrait (not filling the whole view)
     self.processor.previewLayer.frame = self.view.bounds;
@@ -939,7 +979,7 @@ parentViewController:(UIViewController*)parentViewController
 
 - (void)torchButtonPressed:(id)sender
 {
-  [self.processor performSelector:@selector(toggleTorch) withObject:nil afterDelay:0];
+    [self.processor performSelector:@selector(toggleTorch) withObject:nil afterDelay:0];
 }
 
 //--------------------------------------------------------------------------
@@ -963,11 +1003,8 @@ parentViewController:(UIViewController*)parentViewController
     {
         return [self buildOverlayViewFromXib];
     }
-    CGRect bounds = self.view.bounds;
-    bounds = CGRectMake(0, 0, bounds.size.width, bounds.size.height);
-
-    UIView* overlayView = [[UIView alloc] initWithFrame:bounds];
-    overlayView.autoresizesSubviews = YES;
+    UIView* overlayView = [[UIView alloc] initWithFrame:self.view.bounds];
+    //    overlayView.autoresizesSubviews = YES;
     overlayView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlayView.opaque              = NO;
 
@@ -975,98 +1012,87 @@ parentViewController:(UIViewController*)parentViewController
     toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
 
     id cancelButton = [[[UIBarButtonItem alloc]
-                       initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
-                       target:(id)self
-                       action:@selector(cancelButtonPressed:)
-                       ] autorelease];
+                        initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
+                        target:(id)self
+                        action:@selector(cancelButtonPressed:)
+                        ] autorelease];
 
 
     id flexSpace = [[[UIBarButtonItem alloc]
-                    initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace
-                    target:nil
-                    action:nil
-                    ] autorelease];
+                     initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace
+                     target:nil
+                     action:nil
+                     ] autorelease];
 
     id flipCamera = [[[UIBarButtonItem alloc]
-                       initWithBarButtonSystemItem:UIBarButtonSystemItemCamera
-                       target:(id)self
-                       action:@selector(flipCameraButtonPressed:)
-                       ] autorelease];
+                      initWithBarButtonSystemItem:UIBarButtonSystemItemCamera
+                      target:(id)self
+                      action:@selector(flipCameraButtonPressed:)
+                      ] autorelease];
 
     NSMutableArray *items;
 
 #if USE_SHUTTER
     id shutterButton = [[[UIBarButtonItem alloc]
-                        initWithBarButtonSystemItem:UIBarButtonSystemItemCamera
-                        target:(id)self
-                        action:@selector(shutterButtonPressed)
-                        ] autorelease];
+                         initWithBarButtonSystemItem:UIBarButtonSystemItemCamera
+                         target:(id)self
+                         action:@selector(shutterButtonPressed)
+                         ] autorelease];
 
     if (_processor.isShowFlipCameraButton) {
-      items = [NSMutableArray arrayWithObjects:flexSpace, cancelButton, flexSpace, flipCamera, shutterButton, nil];
+        items = [NSMutableArray arrayWithObjects:flexSpace, cancelButton, flexSpace, flipCamera, shutterButton, nil];
     } else {
-      items = [NSMutableArray arrayWithObjects:flexSpace, cancelButton, flexSpace, shutterButton, nil];
+        items = [NSMutableArray arrayWithObjects:flexSpace, cancelButton, flexSpace, shutterButton, nil];
     }
 #else
     if (_processor.isShowFlipCameraButton) {
-      items = [@[flexSpace, cancelButton, flexSpace, flipCamera] mutableCopy];
+        items = [@[flexSpace, cancelButton, flexSpace, flipCamera] mutableCopy];
     } else {
-      items = [@[flexSpace, cancelButton, flexSpace] mutableCopy];
+        items = [@[flexSpace, cancelButton, flexSpace] mutableCopy];
     }
 #endif
 
     if (_processor.isShowTorchButton && !_processor.isFrontCamera) {
-      AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-      if ([device hasTorch] && [device hasFlash]) {
-        NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
-        NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
-        NSString *imagePath = [bundle pathForResource:@"torch" ofType:@"png"];
-        UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+        AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+        if ([device hasTorch] && [device hasFlash]) {
+            NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+            NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+            NSString *imagePath = [bundle pathForResource:@"torch" ofType:@"png"];
+            UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
 
-        id torchButton = [[[UIBarButtonItem alloc]
-                           initWithImage:image
-                                   style:UIBarButtonItemStylePlain
-                                  target:(id)self
-                                  action:@selector(torchButtonPressed:)
-                           ] autorelease];
+            id torchButton = [[[UIBarButtonItem alloc]
+                               initWithImage:image
+                               style:UIBarButtonItemStylePlain
+                               target:(id)self
+                               action:@selector(torchButtonPressed:)
+                               ] autorelease];
 
-      [items insertObject:torchButton atIndex:0];
+            [items insertObject:torchButton atIndex:0];
+        }
     }
-  }
 
     toolbar.items = items;
 
-    bounds = overlayView.bounds;
-
     [toolbar sizeToFit];
     CGFloat toolbarHeight  = [toolbar frame].size.height;
-    CGFloat rootViewHeight = CGRectGetHeight(bounds);
-    CGFloat rootViewWidth  = CGRectGetWidth(bounds);
+    CGFloat rootViewHeight = CGRectGetHeight(overlayView.bounds);
+    CGFloat rootViewWidth  = CGRectGetWidth(overlayView.bounds);
     CGRect  rectArea       = CGRectMake(0, rootViewHeight - toolbarHeight, rootViewWidth, toolbarHeight);
     [toolbar setFrame:rectArea];
 
     [overlayView addSubview: toolbar];
 
     UIImage* reticleImage = [self buildReticleImage];
-    UIView* reticleView = [[[UIImageView alloc] initWithImage:reticleImage] autorelease];
-    CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
+    UIImageView* reticleView = [[[UIImageView alloc] initWithImage:reticleImage] autorelease];
 
-    rectArea = CGRectMake(
-        (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
-        (CGFloat) (0.5 * (rootViewHeight - minAxis)),
-        minAxis,
-        minAxis
-    );
-
-    [reticleView setFrame:rectArea];
-
+    CGRect reticleFrame = overlayView.bounds;
+    [reticleView setFrame:reticleFrame];
     reticleView.opaque           = NO;
-    reticleView.contentMode      = UIViewContentModeScaleAspectFit;
     reticleView.autoresizingMask = (UIViewAutoresizing) (0
-        | UIViewAutoresizingFlexibleLeftMargin
-        | UIViewAutoresizingFlexibleRightMargin
-        | UIViewAutoresizingFlexibleTopMargin
-        | UIViewAutoresizingFlexibleBottomMargin)
+                                                         | UIViewAutoresizingFlexibleLeftMargin
+                                                         | UIViewAutoresizingFlexibleRightMargin
+                                                         | UIViewAutoresizingFlexibleTopMargin
+                                                         | UIViewAutoresizingFlexibleBottomMargin)
     ;
 
     [overlayView addSubview: reticleView];
