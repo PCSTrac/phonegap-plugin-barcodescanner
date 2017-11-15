@@ -384,10 +384,9 @@ parentViewController:(UIViewController*)parentViewController
 //--------------------------------------------------------------------------
 - (void)openDialog {
     self.presentingViewController = self.parentViewController;
-    [self.parentViewController
-     presentViewController:self.viewController
-     animated:self.isTransitionAnimated completion:nil
-     ];
+    [self.parentViewController presentViewController:self.viewController
+                                            animated:self.isTransitionAnimated
+                                          completion:nil];
 }
 
 //--------------------------------------------------------------------------
@@ -948,6 +947,7 @@ parentViewController:(UIViewController*)parentViewController
     // this fixes the bug when the statusbar is landscape, and the preview layer
     // starts up in portrait (not filling the whole view)
     self.processor.previewLayer.frame = self.view.bounds;
+    self.overlayView.frame = self.view.bounds;
 }
 
 //--------------------------------------------------------------------------
@@ -1004,7 +1004,7 @@ parentViewController:(UIViewController*)parentViewController
         return [self buildOverlayViewFromXib];
     }
     UIView* overlayView = [[UIView alloc] initWithFrame:self.view.bounds];
-    //    overlayView.autoresizesSubviews = YES;
+    overlayView.autoresizesSubviews = YES;
     overlayView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlayView.opaque              = NO;
 
@@ -1085,15 +1085,11 @@ parentViewController:(UIViewController*)parentViewController
     UIImage* reticleImage = [self buildReticleImage];
     UIImageView* reticleView = [[[UIImageView alloc] initWithImage:reticleImage] autorelease];
 
-    CGRect reticleFrame = overlayView.bounds;
+    CGRect reticleFrame = CGRectInset(overlayView.bounds, 0.0, toolbarHeight);
+    reticleFrame.origin.y -= toolbarHeight;
     [reticleView setFrame:reticleFrame];
     reticleView.opaque           = NO;
-    reticleView.autoresizingMask = (UIViewAutoresizing) (0
-                                                         | UIViewAutoresizingFlexibleLeftMargin
-                                                         | UIViewAutoresizingFlexibleRightMargin
-                                                         | UIViewAutoresizingFlexibleTopMargin
-                                                         | UIViewAutoresizingFlexibleBottomMargin)
-    ;
+    reticleView.autoresizingMask = (UIViewAutoresizing)(UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin);
 
     [overlayView addSubview: reticleView];
 
@@ -1192,3 +1188,5 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 @end
+
+
