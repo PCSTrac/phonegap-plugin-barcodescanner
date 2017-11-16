@@ -72,6 +72,20 @@
 
 @implementation PartialViewController
 
+- (UIView *)passthroughView {
+    static PassthroughView *instance = nil;
+    if (instance == nil) {
+        instance = [[PassthroughView alloc] initWithFrame:self.containerView.bounds];
+        instance.passthroughViews = @[self.presentingViewController.view];
+        instance.backgroundColor = [UIColor clearColor];
+    }
+    return instance;
+}
+
+- (void)presentationTransitionWillBegin {
+    [self.containerView addSubview:self.passthroughView];
+}
+
 - (CGRect)frameOfPresentedViewInContainerView {
     CGFloat height = CGRectGetHeight(self.containerView.frame) / 2.0;
     return CGRectMake(0,
@@ -990,7 +1004,7 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)loadView {
-    self.view = [[PassthroughView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
+    self.view = [[UIView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
 }
 
 - (void)viewDidLoad {
