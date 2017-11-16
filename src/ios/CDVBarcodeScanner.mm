@@ -15,6 +15,33 @@
 #import "zxing-all-in-one.h"
 #import <Cordova/CDVPlugin.h>
 
+//------------------------------------------------------------------------------
+// View helper for passing through touch events
+//------------------------------------------------------------------------------
+
+@interface PassthroughView : UIView
+
+@property (strong, nonatomic) NSArray* passthroughViews;
+
+@end
+
+@implementation PassthroughView
+
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent *)event
+{
+    UIView* hit = [super hitTest:point withEvent:event];
+    if (hit == self)
+        for (UIView* passthroughView in _passthroughViews)
+        {
+            hit = [passthroughView hitTest:[self convertPoint:point toView:passthroughView]
+                                 withEvent:event];
+            if (hit)
+                break;
+        }
+    return hit;
+}
+
+@end
 
 //------------------------------------------------------------------------------
 // Delegate to handle orientation functions
@@ -48,13 +75,56 @@
 - (CGRect)frameOfPresentedViewInContainerView {
     CGFloat height = CGRectGetHeight(self.containerView.frame) / 2.0;
     return CGRectMake(0,
-                      CGRectGetHeight(self.containerView.bounds) - height,
+                      0,
                       CGRectGetWidth(self.containerView.frame),
                       height);
 }
 
 - (void)containerViewWillLayoutSubviews {
     self.presentedView.frame = [self frameOfPresentedViewInContainerView];
+}
+
+@end
+
+@interface CDVBarcode : NSObject
+@property (nonatomic, strong, readwrite) NSString *text;
+@property (nonatomic, strong, readwrite) NSString *format;
+@end
+
+@implementation CDVBarcode
+
+@synthesize text = _text;
+@synthesize format = _format;
+
+- (id)initWithText:(NSString *)text format:(NSString *)format {
+    if ((self = [super self])) {
+        self.text = text;
+        self.format = format;
+    }
+
+    return self;
+}
+
+- (BOOL)isEqualToBarcode:(CDVBarcode *)other {
+    if ([self.text isEqualToString:other.text] &&
+        [self.format isEqualToString:other.format]) {
+        return YES;
+    }
+    return NO;
+}
+
+- (BOOL)isEqual:(id)object {
+    if (self == object) {
+        return YES;
+    }
+    if (![object isKindOfClass:[CDVBarcode class]]) {
+        return  NO;
+    }
+    return [self isEqualToBarcode:(CDVBarcode *)object];
+}
+
+- (NSUInteger)hash {
+    return [self.text hash] ^ [self.format hash];
 }
 
 @end
@@ -94,6 +164,7 @@
 @property (nonatomic)         BOOL                        isFlipped;
 @property (nonatomic)         BOOL                        isTransitionAnimated;
 @property (nonatomic)         BOOL                        isSuccessBeepEnabled;
+@property (nonatomic, retain) CDVBarcode*                 lastScannedBarcode;
 
 
 - (id)initWithPlugin:(CDVBarcodeScanner*)plugin callback:(NSString*)callback parentViewController:(UIViewController*)parentViewController alterateOverlayXib:(NSString *)alternateXib;
@@ -435,11 +506,15 @@ parentViewController:(UIViewController*)parentViewController
 //--------------------------------------------------------------------------
 - (void)barcodeScanSucceeded:(NSString*)text format:(NSString*)format {
     dispatch_sync(dispatch_get_main_queue(), ^{
-        [self barcodeScanDone:^{
+        CDVBarcode *barcode = [[CDVBarcode alloc] initWithText:text format:format];
+        if (![self.lastScannedBarcode isEqualToBarcode:barcode]) {
+            self.lastScannedBarcode = barcode;
+
             [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
-        }];
-        if (self.isSuccessBeepEnabled) {
-            AudioServicesPlaySystemSound(_soundFileObject);
+
+            if (self.isSuccessBeepEnabled) {
+                AudioServicesPlaySystemSound(_soundFileObject);
+            }
         }
     });
 }
@@ -915,7 +990,7 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)loadView {
-    self.view = [[UIView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
+    self.view = [[PassthroughView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
 }
 
 - (void)viewDidLoad {
@@ -1188,5 +1263,4 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 @end
-
 
