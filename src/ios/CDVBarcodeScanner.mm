@@ -148,11 +148,12 @@
 //------------------------------------------------------------------------------
 @interface CDVBarcodeScanner : CDVPlugin {}
 - (NSString*)isScanNotPossible;
-- (void)scan:(CDVInvokedUrlCommand*)command;
-- (void)encode:(CDVInvokedUrlCommand*)command;
-- (void)returnImage:(NSString*)filePath format:(NSString*)format callback:(NSString*)callback;
-- (void)returnSuccess:(NSString*)scannedText format:(NSString*)format cancelled:(BOOL)cancelled flipped:(BOOL)flipped callback:(NSString*)callback;
-- (void)returnError:(NSString*)message callback:(NSString*)callback;
+- (void)scan:(CDVInvokedUrlCommand *)command;
+- (void)stopScanning:(CDVInvokedUrlCommand *)command;
+- (void)encode:(CDVInvokedUrlCommand *)command;
+- (void)returnImage:(NSString *)filePath format:(NSString *)format callback:(NSString *)callback;
+- (void)returnSuccess:(NSString *)scannedText format:(NSString *)format cancelled:(BOOL)cancelled flipped:(BOOL)flipped callback:(NSString *)callback;
+- (void)returnError:(NSString *)message callback:(NSString *)callback;
 @end
 
 //------------------------------------------------------------------------------
@@ -229,10 +230,16 @@
 
 @end
 
+@interface CDVBarcodeScanner ()
+@property (nonatomic, strong, readwrite) CDVbcsProcessor *processor;
+@end
+
 //------------------------------------------------------------------------------
 // plugin class
 //------------------------------------------------------------------------------
 @implementation CDVBarcodeScanner
+
+@synthesize processor=_processor;
 
 //--------------------------------------------------------------------------
 - (NSString*)isScanNotPossible {
@@ -253,11 +260,8 @@
             authStatus == AVAuthorizationStatusRestricted);
 }
 
-
-
 //--------------------------------------------------------------------------
-- (void)scan:(CDVInvokedUrlCommand*)command {
-    CDVbcsProcessor* processor;
+- (void)scan:(CDVInvokedUrlCommand *)command {
     NSString*       callback;
     NSString*       capabilityError;
 
@@ -291,36 +295,40 @@
         return;
     }
 
-    processor = [[[CDVbcsProcessor alloc]
-                  initWithPlugin:self
-                  callback:callback
-                  parentViewController:self.viewController
-                  alterateOverlayXib:overlayXib
-                  ] autorelease];
+    self.processor = [[CDVbcsProcessor alloc] initWithPlugin:self
+                                                    callback:callback
+                                        parentViewController:self.viewController
+                                          alterateOverlayXib:overlayXib];
     // queue [processor scanBarcode] to run on the event loop
 
     if (preferFrontCamera) {
-        processor.isFrontCamera = true;
+        _processor.isFrontCamera = true;
     }
 
     if (showFlipCameraButton) {
-        processor.isShowFlipCameraButton = true;
+        _processor.isShowFlipCameraButton = true;
     }
 
     if (showTorchButton) {
-        processor.isShowTorchButton = true;
+        _processor.isShowTorchButton = true;
     }
 
-    processor.isSuccessBeepEnabled = !disableSuccessBeep;
+    _processor.isSuccessBeepEnabled = !disableSuccessBeep;
 
-    processor.is1D = !disable1d;
-    processor.is2D = !disable2d;
+    _processor.is1D = !disable1d;
+    _processor.is2D = !disable2d;
 
-    processor.isTransitionAnimated = !disableAnimations;
+    _processor.isTransitionAnimated = !disableAnimations;
 
-    processor.formats = options[@"formats"];
+    _processor.formats = options[@"formats"];
 
-    [processor performSelector:@selector(scanBarcode) withObject:nil afterDelay:0];
+    [_processor performSelector:@selector(scanBarcode) withObject:nil afterDelay:0];
+}
+
+//--------------------------------------------------------------------------
+- (void)stopScanning:(CDVInvokedUrlCommand *)command {
+    [_processor barcodeScanCancelled];
+    self.processor = nil;
 }
 
 //--------------------------------------------------------------------------
@@ -328,15 +336,13 @@
     if([command.arguments count] < 1)
         [self returnError:@"Too few arguments!" callback:command.callbackId];
 
-    CDVqrProcessor* processor;
     NSString*       callback;
+    CDVqrProcessor *processor;
     callback = command.callbackId;
 
-    processor = [[CDVqrProcessor alloc]
-                 initWithPlugin:self
-                 callback:callback
-                 stringToEncode: command.arguments[0][@"data"]
-                 ];
+    processor = [[CDVqrProcessor alloc] initWithPlugin:self
+                                              callback:callback
+                                        stringToEncode: command.arguments[0][@"data"]];
 
     [processor retain];
     [processor retain];
