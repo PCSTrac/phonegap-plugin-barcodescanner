@@ -166,6 +166,7 @@
 @property (nonatomic, retain) UIViewController*           presentingViewController;
 @property (nonatomic, retain) CDVbcsViewController*        viewController;
 @property (nonatomic, retain) AVCaptureSession*           captureSession;
+@property (nonatomic, retain) AVCaptureMetadataOutput*    metadataOutput;
 @property (nonatomic, retain) AVCaptureVideoPreviewLayer* previewLayer;
 @property (nonatomic, retain) NSString*                   alternateXib;
 @property (nonatomic, retain) NSMutableArray*             results;
@@ -432,7 +433,16 @@ parentViewController:(UIViewController*)parentViewController
     CFURLRef soundFileURLRef  = CFBundleCopyResourceURL(CFBundleGetMainBundle(), CFSTR("CDVBarcodeScanner.bundle/beep"), CFSTR ("caf"), NULL);
     AudioServicesCreateSystemSoundID(soundFileURLRef, &_soundFileObject);
 
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleRectOfInterest:)
+                                                 name:AVCaptureInputPortFormatDescriptionDidChangeNotification
+                                               object:nil];
+
     return self;
+}
+
+- (void)handleRectOfInterest:(NSNotification *)notification {
+    self.metadataOutput.rectOfInterest = CGRectMake(0, 0, 0.5, 1.0);
 }
 
 //--------------------------------------------------------------------------
@@ -660,6 +670,7 @@ parentViewController:(UIViewController*)parentViewController
     // setup capture preview layer
     self.previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:captureSession];
     self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    self.metadataOutput = output;
 
     // run on next event loop pass [captureSession startRunning]
     [captureSession performSelector:@selector(startRunning) withObject:nil afterDelay:0];
@@ -1012,6 +1023,7 @@ parentViewController:(UIViewController*)parentViewController
 //--------------------------------------------------------------------------
 - (void)loadView {
     self.view = [[UIView alloc] initWithFrame:self.processor.presentingViewController.view.frame];
+    self.view.clipsToBounds = YES;
 }
 
 - (void)viewDidLoad {
@@ -1019,7 +1031,7 @@ parentViewController:(UIViewController*)parentViewController
 
     // setup capture preview layer
     AVCaptureVideoPreviewLayer* previewLayer = self.processor.previewLayer;
-    previewLayer.frame = self.view.bounds;
+    previewLayer.frame = [UIScreen mainScreen].bounds;
     previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
 
     if ([previewLayer.connection isVideoOrientationSupported]) {
@@ -1042,7 +1054,7 @@ parentViewController:(UIViewController*)parentViewController
 - (void)viewWillLayoutSubviews {
     // this fixes the bug when the statusbar is landscape, and the preview layer
     // starts up in portrait (not filling the whole view)
-    self.processor.previewLayer.frame = self.view.bounds;
+    self.processor.previewLayer.frame = [UIScreen mainScreen].bounds;
     self.overlayView.frame = self.view.bounds;
 }
 
@@ -1284,3 +1296,4 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 @end
+
