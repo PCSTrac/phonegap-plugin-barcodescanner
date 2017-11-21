@@ -1224,9 +1224,8 @@ parentViewController:(UIViewController*)parentViewController
         CGContextSetStrokeColorWithColor(context, color.CGColor);
         CGContextSetLineWidth(context, RETICLE_WIDTH);
         CGContextBeginPath(context);
-        CGFloat lineOffset = (CGFloat) (RETICLE_OFFSET+(0.5*RETICLE_WIDTH));
-        CGContextMoveToPoint(context, lineOffset, RETICLE_SIZE/2);
-        CGContextAddLineToPoint(context, RETICLE_SIZE-lineOffset, (CGFloat) (0.5*RETICLE_SIZE));
+        CGContextMoveToPoint(context, 0, RETICLE_SIZE/2);
+        CGContextAddLineToPoint(context, RETICLE_SIZE, (CGFloat) (0.5*RETICLE_SIZE));
         CGContextStrokePath(context);
     }
 
