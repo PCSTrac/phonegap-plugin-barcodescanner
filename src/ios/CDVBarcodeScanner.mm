@@ -377,6 +377,7 @@
                                resultWithStatus: CDVCommandStatus_OK
                                messageAsDictionary: resultDict
                                ];
+    [result setKeepCallbackAsBool:YES]; // tell Cordova not to cleanup the callback id so it can be called multiple times
     [self.commandDelegate sendPluginResult:result callbackId:callback];
 }
 
@@ -1283,4 +1284,3 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 @end
-
