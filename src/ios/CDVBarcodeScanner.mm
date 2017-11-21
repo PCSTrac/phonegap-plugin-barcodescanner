@@ -480,7 +480,7 @@ parentViewController:(UIViewController*)parentViewController
     self.viewController.orientationDelegate = self.plugin.viewController;
 
     // delayed [self openDialog];
-    [self performSelector:@selector(openDialog) withObject:nil afterDelay:1];
+    [self performSelector:@selector(openDialog) withObject:nil afterDelay:0];
 }
 
 //--------------------------------------------------------------------------
@@ -1296,4 +1296,3 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 @end
-
