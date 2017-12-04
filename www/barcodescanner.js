@@ -120,6 +120,17 @@ BarcodeScanner.prototype.scan = function (successCallback, errorCallback, config
                 config
             );
         };
+BarcodeScanner.prototype.stopScanning = function () {
+
+            exec(
+                function(result) {
+                },
+                function(error) {
+                },
+                'BarcodeScanner',
+                'stopScanning'
+            );
+        };
 
         //-------------------------------------------------------------------
         BarcodeScanner.prototype.encode = function (type, data, successCallback, errorCallback, options) {
