@@ -540,10 +540,14 @@ parentViewController:(UIViewController*)parentViewController
 - (void)barcodeScanSucceeded:(NSString*)text format:(NSString*)format {
     dispatch_sync(dispatch_get_main_queue(), ^{
         CDVBarcode *barcode = [[CDVBarcode alloc] initWithText:text format:format];
-          [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
+          if (![self.lastScannedBarcode isEqualToBarcode:barcode]) {
+            self.lastScannedBarcode = barcode;
 
-          if (self.isSuccessBeepEnabled) {
-              AudioServicesPlaySystemSound(_soundFileObject);
+            [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
+
+            if (self.isSuccessBeepEnabled) {
+                AudioServicesPlaySystemSound(_soundFileObject);
+            }
           }
     });
 }
