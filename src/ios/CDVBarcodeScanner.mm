@@ -228,6 +228,8 @@
 - (UIImage*)buildReticleImage;
 - (void)shutterButtonPressed;
 - (IBAction)cancelButtonPressed:(id)sender;
+- (IBAction)flipCameraButtonPressed:(id)sender;
+- (IBAction)torchButtonPressed:(id)sender;
 
 @end
 
@@ -538,23 +540,21 @@ parentViewController:(UIViewController*)parentViewController
 - (void)barcodeScanSucceeded:(NSString*)text format:(NSString*)format {
     dispatch_sync(dispatch_get_main_queue(), ^{
         CDVBarcode *barcode = [[CDVBarcode alloc] initWithText:text format:format];
-        if (![self.lastScannedBarcode isEqualToBarcode:barcode]) {
-            self.lastScannedBarcode = barcode;
+          [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
 
-            [self.plugin returnSuccess:text format:format cancelled:FALSE flipped:FALSE callback:self.callback];
-
-            if (self.isSuccessBeepEnabled) {
-                AudioServicesPlaySystemSound(_soundFileObject);
-            }
-        }
+          if (self.isSuccessBeepEnabled) {
+              AudioServicesPlaySystemSound(_soundFileObject);
+          }
     });
 }
 
 //--------------------------------------------------------------------------
 - (void)barcodeScanFailed:(NSString*)message {
-    [self barcodeScanDone:^{
-        [self.plugin returnError:message callback:self.callback];
-    }];
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        [self barcodeScanDone:^{
+            [self.plugin returnError:message callback:self.callback];
+        }];
+    });
 }
 
 //--------------------------------------------------------------------------
@@ -655,18 +655,7 @@ parentViewController:(UIViewController*)parentViewController
         return @"unable to add video capture output to session";
     }
 
-    [output setMetadataObjectTypes:@[AVMetadataObjectTypeQRCode,
-                                     AVMetadataObjectTypeAztecCode,
-                                     AVMetadataObjectTypeDataMatrixCode,
-                                     AVMetadataObjectTypeUPCECode,
-                                     AVMetadataObjectTypeEAN8Code,
-                                     AVMetadataObjectTypeEAN13Code,
-                                     AVMetadataObjectTypeCode128Code,
-                                     AVMetadataObjectTypeCode93Code,
-                                     AVMetadataObjectTypeCode39Code,
-                                     AVMetadataObjectTypeITF14Code,
-                                     AVMetadataObjectTypeInterleaved2of5Code,
-                                     AVMetadataObjectTypePDF417Code]];
+    [output setMetadataObjectTypes:[self formatObjectTypes]];
 
     // setup capture preview layer
     self.previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:captureSession];
@@ -763,6 +752,33 @@ parentViewController:(UIViewController*)parentViewController
     if (format.type == AVMetadataObjectTypeInterleaved2of5Code)          return @"ITF";
     if (format.type == AVMetadataObjectTypePDF417Code)      return @"PDF_417";
     return @"???";
+}
+
+//--------------------------------------------------------------------------
+// convert string formats to metadata objects
+//--------------------------------------------------------------------------
+- (NSArray*) formatObjectTypes {
+    NSArray *supportedFormats = nil;
+    if (self.formats != nil) {
+        supportedFormats = [self.formats componentsSeparatedByString:@","];
+    }
+
+    NSMutableArray * formatObjectTypes = [NSMutableArray array];
+
+    if (self.formats == nil || [supportedFormats containsObject:@"QR_CODE"]) [formatObjectTypes addObject:AVMetadataObjectTypeQRCode];
+    if (self.formats == nil || [supportedFormats containsObject:@"AZTEC"]) [formatObjectTypes addObject:AVMetadataObjectTypeAztecCode];
+    if (self.formats == nil || [supportedFormats containsObject:@"DATA_MATRIX"]) [formatObjectTypes addObject:AVMetadataObjectTypeDataMatrixCode];
+    if (self.formats == nil || [supportedFormats containsObject:@"UPC_E"]) [formatObjectTypes addObject:AVMetadataObjectTypeUPCECode];
+    if (self.formats == nil || [supportedFormats containsObject:@"EAN_8"]) [formatObjectTypes addObject:AVMetadataObjectTypeEAN8Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"EAN_13"]) [formatObjectTypes addObject:AVMetadataObjectTypeEAN13Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"CODE_128"]) [formatObjectTypes addObject:AVMetadataObjectTypeCode128Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"CODE_93"]) [formatObjectTypes addObject:AVMetadataObjectTypeCode93Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"CODE_39"]) [formatObjectTypes addObject:AVMetadataObjectTypeCode39Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"ITF"]) [formatObjectTypes addObject:AVMetadataObjectTypeITF14Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"ITF"]) [formatObjectTypes addObject:AVMetadataObjectTypeInterleaved2of5Code];
+    if (self.formats == nil || [supportedFormats containsObject:@"PDF_417"]) [formatObjectTypes addObject:AVMetadataObjectTypePDF417Code];
+
+    return formatObjectTypes;
 }
 
 //--------------------------------------------------------------------------
@@ -1073,7 +1089,7 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 //--------------------------------------------------------------------------
-- (void)shutterButtonPressed {
+- (IBAction)shutterButtonPressed {
     self.shutterPressed = YES;
 }
 
@@ -1082,12 +1098,12 @@ parentViewController:(UIViewController*)parentViewController
     [self.processor performSelector:@selector(barcodeScanCancelled) withObject:nil afterDelay:0];
 }
 
-- (void)flipCameraButtonPressed:(id)sender
+- (IBAction)flipCameraButtonPressed:(id)sender
 {
     [self.processor performSelector:@selector(flipCamera) withObject:nil afterDelay:0];
 }
 
-- (void)torchButtonPressed:(id)sender
+- (IBAction)torchButtonPressed:(id)sender
 {
     [self.processor performSelector:@selector(toggleTorch) withObject:nil afterDelay:0];
 }
@@ -1102,6 +1118,15 @@ parentViewController:(UIViewController*)parentViewController
         NSLog(@"%@", @"An error occurred loading the overlay xib.  It appears that the overlayView outlet is not set.");
         return nil;
     }
+
+	self.overlayView.autoresizesSubviews = YES;
+    self.overlayView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.overlayView.opaque              = NO;
+
+	CGRect bounds = self.view.bounds;
+    bounds = CGRectMake(0, 0, bounds.size.width, bounds.size.height);
+
+	[self.overlayView setFrame:bounds];
 
     return self.overlayView;
 }
