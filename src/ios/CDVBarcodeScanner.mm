@@ -665,6 +665,7 @@ parentViewController:(UIViewController*)parentViewController
                                      AVMetadataObjectTypeCode93Code,
                                      AVMetadataObjectTypeCode39Code,
                                      AVMetadataObjectTypeITF14Code,
+                                     AVMetadataObjectTypeInterleaved2of5Code,
                                      AVMetadataObjectTypePDF417Code]];
 
     // setup capture preview layer
@@ -759,6 +760,7 @@ parentViewController:(UIViewController*)parentViewController
     if (format.type == AVMetadataObjectTypeCode93Code)      return @"CODE_93";
     if (format.type == AVMetadataObjectTypeCode39Code)      return @"CODE_39";
     if (format.type == AVMetadataObjectTypeITF14Code)          return @"ITF";
+    if (format.type == AVMetadataObjectTypeInterleaved2of5Code)          return @"ITF";
     if (format.type == AVMetadataObjectTypePDF417Code)      return @"PDF_417";
     return @"???";
 }
